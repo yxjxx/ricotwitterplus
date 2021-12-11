@@ -4,21 +4,39 @@ BOOL noads = YES;
 BOOL hideNewsAndTrending = YES;
 BOOL hideWhoToFollow = YES;
 
-%group RicoTest
+
+  %hook NSBundle
+  - (id)objectForInfoDictionaryKey:(NSString *)key { 
+      if ([key isEqualToString:@"CFBundleIdentifier"]) {
+        return @"com.atebits.Tweetie2";
+      } else {
+        return %orig;
+      }
+  }
+
+  - (NSString *)bundleIdentifier {
+    if (self != [NSBundle mainBundle]) {
+      return %orig;
+    }    
+    return @"com.atebits.Tweetie2";
+  }
+  %end
+
   %hook T1SlideshowViewController
   - (void)imageDisplayView:(id)arg1 didLongPress:(id)arg2 {
       %orig;
   }
 
   - (void)slideshowSeekController:(id)arg1 didLongPressWithRecognizer:(id)arg2 {
-      UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Welcome" message:@"RicoTest!" delegate:nil cancelButtonTitle:@"Thanks" otherButtonTitles:nil];
+      NSString *bid = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleIdentifier"];
+      UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Welcome" message:bid delegate:nil cancelButtonTitle:@"Thanks" otherButtonTitles:nil];
       [alert show];
       %orig;
   }
   %end
-%end
 
-%group NewsFeedAndPosts
+
+
   %hook TFNItemsDataViewController
     - (id)tableViewCellForItem:(id)arg1 atIndexPath:(id)arg2 {
       UITableViewCell *tbvCell = %orig;
@@ -137,9 +155,87 @@ BOOL hideWhoToFollow = YES;
       return %orig;
     }
   %end
+
+
+/// Fix Twitter Login KeyChain
+/// Credit goes to @BandarHL (https://twitter.com/bandarhl?s=21) for his code: https://gist.github.com/BandarHL/e99a4ab4afb3f74f29c9525684092563
+
+%hook TFSKeychain
+- (NSString *)providerDefaultAccessGroup {
+    NSDictionary *query = [NSDictionary dictionaryWithObjectsAndKeys:
+                           (__bridge NSString *)kSecClassGenericPassword, (__bridge NSString *)kSecClass,
+                           @"bundleSeedID", kSecAttrAccount,
+                           @"", kSecAttrService,
+                           (id)kCFBooleanTrue, kSecReturnAttributes,
+                           nil];
+    CFDictionaryRef result = nil;
+    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, (CFTypeRef *)&result);
+    if (status == errSecItemNotFound)
+        status = SecItemAdd((__bridge CFDictionaryRef)query, (CFTypeRef *)&result);
+        if (status != errSecSuccess)
+            return nil;
+    NSString *accessGroup = [(__bridge NSDictionary *)result objectForKey:(__bridge NSString *)kSecAttrAccessGroup];
+
+    return accessGroup;
+}
+- (NSString *)providerSharedAccessGroup {
+    NSDictionary *query = [NSDictionary dictionaryWithObjectsAndKeys:
+                           (__bridge NSString *)kSecClassGenericPassword, (__bridge NSString *)kSecClass,
+                           @"bundleSeedID", kSecAttrAccount,
+                           @"", kSecAttrService,
+                           (id)kCFBooleanTrue, kSecReturnAttributes,
+                           nil];
+    CFDictionaryRef result = nil;
+    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, (CFTypeRef *)&result);
+    if (status == errSecItemNotFound)
+        status = SecItemAdd((__bridge CFDictionaryRef)query, (CFTypeRef *)&result);
+        if (status != errSecSuccess)
+            return nil;
+    NSString *accessGroup = [(__bridge NSDictionary *)result objectForKey:(__bridge NSString *)kSecAttrAccessGroup];
+
+    return accessGroup;
+}
 %end
 
-%ctor {
-  %init(RicoTest);
-  %init(NewsFeedAndPosts);
+%hook TFSKeychainDefaultTwitterConfiguration
+- (NSString *)defaultAccessGroup {
+    NSDictionary *query = [NSDictionary dictionaryWithObjectsAndKeys:
+                           (__bridge NSString *)kSecClassGenericPassword, (__bridge NSString *)kSecClass,
+                           @"bundleSeedID", kSecAttrAccount,
+                           @"", kSecAttrService,
+                           (id)kCFBooleanTrue, kSecReturnAttributes,
+                           nil];
+    CFDictionaryRef result = nil;
+    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, (CFTypeRef *)&result);
+    if (status == errSecItemNotFound)
+        status = SecItemAdd((__bridge CFDictionaryRef)query, (CFTypeRef *)&result);
+        if (status != errSecSuccess)
+            return nil;
+    NSString *accessGroup = [(__bridge NSDictionary *)result objectForKey:(__bridge NSString *)kSecAttrAccessGroup];
+
+    return accessGroup;
 }
+- (NSString *)sharedAccessGroup {
+    NSDictionary *query = [NSDictionary dictionaryWithObjectsAndKeys:
+                           (__bridge NSString *)kSecClassGenericPassword, (__bridge NSString *)kSecClass,
+                           @"bundleSeedID", kSecAttrAccount,
+                           @"", kSecAttrService,
+                           (id)kCFBooleanTrue, kSecReturnAttributes,
+                           nil];
+    CFDictionaryRef result = nil;
+    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, (CFTypeRef *)&result);
+    if (status == errSecItemNotFound)
+        status = SecItemAdd((__bridge CFDictionaryRef)query, (CFTypeRef *)&result);
+        if (status != errSecSuccess)
+            return nil;
+    NSString *accessGroup = [(__bridge NSDictionary *)result objectForKey:(__bridge NSString *)kSecAttrAccessGroup];
+
+    return accessGroup;
+}
+%end
+
+
+///%ctor {
+///  %init(RicoTest);
+///  %init(NewsFeedAndPosts);
+///}
